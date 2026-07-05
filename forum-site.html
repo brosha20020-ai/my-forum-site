@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Форум с защитой ника</title>
+    <style>
+        body { font-family: Tahoma, sans-serif; background-color: #f4f4f4; padding: 20px; }
+        .wrapper { max-width: 600px; margin: auto; background: white; border: 1px solid #ccc; padding: 20px; }
+        .post { border-bottom: 1px solid #eee; padding: 10px 0; }
+        .author { font-weight: bold; color: #000080; }
+        .post-img { max-width: 200px; display: block; margin-top: 5px; }
+        textarea { width: 100%; height: 50px; margin-top: 10px; }
+        input { width: 100%; margin-bottom: 10px; }
+        .error { color: red; font-size: 13px; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="wrapper">
+    <div id="posts-container"></div>
+    <hr>
+    <div id="error-msg" class="error"></div>
+    <input type="text" id="username" placeholder="Уникальный никнейм">
+    <textarea id="post-text" placeholder="Сообщение..."></textarea>
+    <input type="file" id="image-input" accept="image/*">
+    <button onclick="addPost()">Отправить</button>
+</div>
+
+<script>
+    const container = document.getElementById('posts-container');
+    const errorMsg = document.getElementById('error-msg');
+    
+    let posts = JSON.parse(localStorage.getItem('forum_posts')) || [];
+    // Список занятых имен
+    let takenNames = JSON.parse(localStorage.getItem('taken_names')) || [];
+    // Имя, которое выбрал текущий пользователь в этом браузере
+    let myName = localStorage.getItem('my_saved_name') || '';
+
+    function render() {
+        container.innerHTML = posts.map(p => `
+            <div class="post">
+                <span class="author">${p.author}</span>: ${p.text}
+                ${p.img ? `<img src="${p.img}" class="post-img">` : ''}
+            </div>
+        `).join('');
+        
+        // Если мы уже выбрали имя, блокируем поле ввода
+        if (myName) {
+            document.getElementById('username').value = myName;
+            document.getElementById('username').disabled = true;
+        }
+    }
+
+    function addPost() {
+        const author = document.getElementById('username').value.trim();
+        const text = document.getElementById('post-text').value.trim();
+        const fileInput = document.getElementById('image-input');
+        
+        if (!author || !text) return;
+
+        // Логика защиты:
+        if (!myName) {
+            // Если имя еще не выбрано, проверяем, не занято ли оно
+            if (takenNames.includes(author)) {
+                errorMsg.innerText = "Это имя уже занято другим человеком!";
+                return;
+            }
+            // Занимаем имя
+            myName = author;
+            takenNames.push(author);
+            localStorage.setItem('my_saved_name', myName);
+            localStorage.setItem('taken_names', JSON.stringify(takenNames));
+        }
+
+        const reader = new FileReader();
+        if (fileInput.files.length > 0) {
+            reader.readAsDataURL(fileInput.files[0]);
+            reader.onload = () => savePost(myName, text, reader.result);
+        } else {
+            savePost(myName, text, null);
+        }
+    }
+
+    function savePost(author, text, img) {
+        posts.push({ author, text, img });
+        localStorage.setItem('forum_posts', JSON.stringify(posts));
+        document.getElementById('post-text').value = '';
+        document.getElementById('image-input').value = '';
+        errorMsg.innerText = "";
+        render();
+    }
+
+    render();
+</script>
+</body>
+</html>
